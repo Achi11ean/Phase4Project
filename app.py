@@ -8,6 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy_serializer import SerializerMixin  # Import SerializerMixin
 from sqlalchemy.orm import relationship
 from sqlalchemy import Table, Column, Integer, ForeignKey  # Add this line
+from sqlalchemy.ext.associationproxy import association_proxy
 from flask_bcrypt import Bcrypt
 from dotenv import load_dotenv  # Import load_dotenv
 import os  # Import os
@@ -19,6 +20,7 @@ db = SQLAlchemy()
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv('DATABASE_URL')
+# app.config["SQLALCHEMY_DATABASE_URI"] = 'sqlite:///main.db'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.json.compact = False
 
@@ -55,6 +57,121 @@ tour_events = db.Table('tour_events',
     db.Column('event_id', db.Integer, db.ForeignKey('events.id'), primary_key=True)
 )
 
+# ------------------------AttendeeVenue----------------------------------#
+class AttendeeVenue(db.Model):
+    __tablename__ = 'attendee_venue'
+    attendee_id = db.Column(db.Integer, db.ForeignKey('attendees.id'), primary_key=True)
+    venue_id = db.Column(db.Integer, db.ForeignKey('venues.id'), primary_key=True)
+    rating = db.Column(db.Integer)
+
+    attendee = db.relationship('Attendee', back_populates='venues')
+    venue = db.relationship('Venue', back_populates='attendees')
+
+@app.post('/venues/<int:venue_id>/rate')
+def rate_venue(venue_id):
+    data = request.get_json()
+    attendee_id = data.get('attendee_id')
+    rating = data.get('rating')
+
+    if not attendee_id or rating is None:
+        return jsonify({'error': 'Attendee ID and rating are required.'}), 400
+
+    attendee = Attendee.query.get(attendee_id)
+    venue = Venue.query.get(venue_id)
+
+    if not attendee or not venue:
+        return jsonify({'error': 'Attendee or Venue not found.'}), 404
+
+    # Check if the AttendeeVenue association already exists
+    av = AttendeeVenue.query.filter_by(attendee_id=attendee_id, venue_id=venue_id).first()
+
+    if not av:
+        # Create a new association
+        av = AttendeeVenue(attendee_id=attendee_id, venue_id=venue_id, rating=rating)
+        db.session.add(av)
+
+    if not (1 <= rating <= 5):
+        return jsonify({'error': 'Rating must be between 1 and 5.'}), 400
+
+    else:
+        # Update existing rating
+        av.rating = rating
+
+    db.session.commit()
+
+    return jsonify({'message': 'Rating submitted successfully.'}), 200
+
+@app.get('/venues/<int:venue_id>/ratings')
+def get_venue_ratings(venue_id):
+    venue = Venue.query.get(venue_id)
+    if not venue:
+        return jsonify({'error': 'Venue not found.'}), 404
+
+    ratings = [
+        {
+            'attendee_id': av.attendee.id,
+            'attendee_name': av.attendee.first_name + ' ' + av.attendee.last_name,
+            'rating': av.rating
+        } for av in venue.attendees
+    ]
+
+    return jsonify(ratings), 200
+
+@app.get('/attendees/<int:attendee_id>/ratings')
+def get_attendee_ratings(attendee_id):
+    attendee = Attendee.query.get(attendee_id)
+    if not attendee:
+        return jsonify({'error': 'Attendee not found.'}), 404
+
+    ratings = [
+        {
+            'venue_id': av.venue.id,
+            'venue_name': av.venue.name,
+            'rating': av.rating
+        } for av in attendee.venues
+    ]
+
+    return jsonify(ratings), 200
+
+@app.patch('/venues/<int:venue_id>/rate')
+def update_venue_rating(venue_id):
+    data = request.get_json()
+    attendee_id = data.get('attendee_id')
+    new_rating = data.get('rating')
+
+    if not attendee_id or new_rating is None:
+        return jsonify({'error': 'Attendee ID and new rating are required.'}), 400
+
+    av = AttendeeVenue.query.filter_by(attendee_id=attendee_id, venue_id=venue_id).first()
+
+    if not av:
+        return jsonify({'error': 'Rating not found.'}), 404
+
+    av.rating = new_rating
+    db.session.commit()
+
+    return jsonify({'message': 'Rating updated successfully.'}), 200
+
+@app.delete('/venues/<int:venue_id>/rate')
+def delete_venue_rating(venue_id):
+    data = request.get_json()
+    attendee_id = data.get('attendee_id')
+
+    if not attendee_id:
+        return jsonify({'error': 'Attendee ID is required.'}), 400
+
+    av = AttendeeVenue.query.filter_by(attendee_id=attendee_id, venue_id=venue_id).first()
+
+    if not av:
+        return jsonify({'error': 'Rating not found.'}), 404
+
+    db.session.delete(av)
+    db.session.commit()
+
+    return jsonify({'message': 'Rating deleted successfully.'}), 200
+
+
+
 # ------------------------Venue----------------------------------#
 class Venue(db.Model, SerializerMixin):
     __tablename__ = "venues"
@@ -64,6 +181,17 @@ class Venue(db.Model, SerializerMixin):
     email = db.Column(db.String(100), nullable=False)
     earnings = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=True)  # Added description column
+
+    attendees = db.relationship('AttendeeVenue', back_populates='venue', cascade='all, delete-orphan')
+    attendee_list = association_proxy('attendees', 'attendee')
+
+    @property
+    def average_rating(self):
+        ratings = [av.rating for av in self.attendees if av.rating is not None]
+        if ratings:
+            return round(sum(ratings) / len(ratings), 2)  # Rounded to 2 decimal places
+        else:
+            return None  # Or return 0 if you prefer
     
     def to_dict(self):
         return {
@@ -73,22 +201,21 @@ class Venue(db.Model, SerializerMixin):
             'email': self.email,
             'earnings': self.earnings,
             'description': self.description,  # Include description in the dictionary
-            'events': [{'id': event.id, 'name': event.name} for event in self.events] if self.events else []
+            'events': [{'id': event.id, 'name': event.name} for event in self.events] if self.events else [],
+            'attendees': [
+                {
+                    'attendee_id': av.attendee.id,
+                    'first_name': av.attendee.first_name,
+                    'rating': av.rating
+                } for av in self.attendees
+            ],
+            'average_rating': self.average_rating  # Include average_rating here
         }
 # Update the decorators to use @app.route() instead of app.get()
 @app.get("/venues")
 def index():
-    return jsonify([
-        { 
-            "id": venue.id, 
-            "name": venue.name, 
-            "organizer": venue.organizer, 
-            "email": venue.email, 
-            "earnings": venue.earnings, 
-            "description": venue.description  # Include description
-        }
-        for venue in Venue.query.all()
-    ]), 200
+    venues = Venue.query.all()
+    return jsonify([venue.to_dict() for venue in venues]), 200
 
 @app.post("/venues")
 def create_venue():
@@ -140,6 +267,7 @@ def delete_venue(id):
     venue = Venue.query.filter(Venue.id == id).first()
     if venue:
         try:
+            AttendeeVenue.query.filter_by(venue_id=id).delete()
             # Delete all associated events first
             for event in venue.events:
                 db.session.delete(event)
@@ -341,6 +469,8 @@ class Attendee(db.Model, SerializerMixin):
     favorite_artists = db.relationship('Artist', secondary='artist_favorites', back_populates='favorited_by')
     attended_events = db.relationship('Event', secondary='attendee_events', back_populates='attendees')
     favorite_events = db.relationship('Event', secondary='attendee_favorites', back_populates='favorited_by', lazy='dynamic')
+    venues = db.relationship('AttendeeVenue', back_populates='attendee', cascade='all, delete-orphan')
+    venue_list = association_proxy('venues', 'venue')
 
     def to_dict(self):
         return {
@@ -353,7 +483,14 @@ class Attendee(db.Model, SerializerMixin):
             self.favorite_event_types.split(',') if isinstance(self.favorite_event_types, str) and self.favorite_event_types else []
             ),
             'favorite_artists': [{'id': artist.id, 'name': artist.name} for artist in self.favorite_artists] if self.favorite_artists else [],
-            'social_media': self.social_media  # This will now return an array of objects
+            'social_media': self.social_media,  # This will now return an array of objects
+            'venues': [
+                {
+                    'venue_id': av.venue.id,
+                    'name': av.venue.name,
+                    'rating': av.rating
+                } for av in self.venues
+            ]
         }
 # POST: Create new attendee with favorite events
 @app.post("/attendees")
@@ -388,6 +525,13 @@ def create_attendee():
         if 'favorite_artist_ids' in data:
             favorite_artists = Artist.query.filter(Artist.id.in_(data['favorite_artist_ids'])).all()
             new_attendee.favorite_artists.extend(favorite_artists)
+        
+        if 'favorite_venues' in data:
+            for venue_data in data['favorite_venues']:
+                venue_id = venue_data['venue_id']
+                rating = venue_data.get('rating')
+                av = AttendeeVenue(attendee=new_attendee, venue_id=venue_id, rating=rating)
+                db.session.add(av)
 
         db.session.add(new_attendee)
         db.session.commit()
@@ -408,6 +552,7 @@ def get_all_attendees():
 
 
 
+# PATCH: Update an attendee by ID
 # PATCH: Update an attendee by ID
 @app.patch("/attendees/<int:id>")
 def update_attendee(id):
@@ -435,19 +580,41 @@ def update_attendee(id):
                 favorite_artists = Artist.query.filter(Artist.id.in_(data['favorite_artist_ids'])).all()
                 attendee.favorite_artists = favorite_artists
 
+            if 'favorite_venues' in data:
+                # Clear existing venues by clearing the relationship
+                attendee.venues.clear()
+
+                # Add new favorite venues with ratings
+                for venue_data in data['favorite_venues']:
+                    venue_id = venue_data['venue_id']
+                    rating = venue_data.get('rating', 1)  # Default rating to 1 if not provided
+
+                    # Fetch the venue object
+                    venue = Venue.query.get(venue_id)
+                    if venue:
+                        av = AttendeeVenue(venue=venue, rating=rating)
+                        attendee.venues.append(av)
+                    else:
+                        return jsonify({"error": f"Venue with id {venue_id} not found"}), 404
+
             db.session.commit()  # Commit the changes
+
+            # **Add the return statement here**
             return jsonify(attendee.to_dict()), 200
+
         except Exception as exception:
             db.session.rollback()  # Rollback in case of error
             return jsonify({"error": str(exception)}), 400
     else:
         return jsonify({"error": "Attendee ID not found"}), 404
+
 # DELETE: Remove an attendee by ID
 @app.delete('/attendees/<int:id>')
 def delete_attendee(id):
     attendee = Attendee.query.filter(Attendee.id == id).first()
     if attendee:
         try:
+            AttendeeVenue.query.filter_by(attendee_id=id).delete()
             db.session.delete(attendee)
             db.session.commit()
             return jsonify({}), 204
