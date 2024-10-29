@@ -32,6 +32,9 @@ migrate = Migrate(app, db)
 bcrypt = Bcrypt(app)
 CORS(app, supports_credentials=True)
 
+@app.route('/')
+def home():
+    return jsonify({"message": "Welcome to the API"}), 200
 attendee_events = Table('attendee_events', db.metadata,
     Column('attendee_id', Integer, ForeignKey('attendees.id'), primary_key=True),
     Column('event_id', Integer, ForeignKey('events.id'), primary_key=True)
