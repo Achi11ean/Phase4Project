@@ -1071,7 +1071,8 @@ def search_tours_by_name():
         return jsonify([tour.to_dict() for tour in tours]), 200
     return jsonify({"error": "Tour name not provided"}), 400
 if __name__ == '__main__':
-    app.run(port=5001, debug=True)
+    port = int(os.environ.get("PORT", 5001))  # Default to 5001 if PORT is not set
+    app.run(port=port, debug=True)
 
 #-------------------------------#User--------------------#
 class User(db.Model):
