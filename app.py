@@ -1149,8 +1149,7 @@ def signup():
     if not all([username, password, user_type]):
         return jsonify({'error': 'Username, password, and user type are required.'}), 400
     
-    # if user_type == 'admin' and session.get('user_type') != 'admin':
-    #     return jsonify({'error': 'Only admins can create admin accounts.'}), 403
+
 
     # Check if username already exists
     if User.query.filter_by(username=username).first():
@@ -1271,8 +1270,8 @@ def is_admin_user(id = ''):
 @app.delete('/api/users/<int:user_id>')
 def delete_user(user_id):
     # Check if the current user is an admin
-    # if not is_admin_user():
-    #     return jsonify({'error': 'Unauthorized access'}), 403
+    if not is_admin_user():
+        return jsonify({'error': 'Unauthorized access'}), 403
 
     # Retrieve the user to be deleted
     user_to_delete = User.query.get(user_id)
