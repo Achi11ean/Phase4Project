@@ -30,7 +30,7 @@ app.secret_key = os.getenv('SECRET_KEY', 'default_secret_key')
 db.init_app(app)
 migrate = Migrate(app, db)
 bcrypt = Bcrypt(app)
-CORS(app, supports_credentials=True)
+CORS(app, supports_credentials=True, origins=["https://iridescent-prism.netlify.app"])
 
 @app.route('/')
 def home():
