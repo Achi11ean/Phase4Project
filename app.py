@@ -1283,13 +1283,16 @@ def delete_user(user_id):
         return jsonify({'error': 'You cannot delete your own account'}), 400
 
     try:
-
+        for attendee in user_to_delete.attendees:  # Assuming a one-to-many relationship with attendees
+            db.session.delete(attendee)
         for artist in user_to_delete.artists:  # Assuming a one-to-many relationship
             db.session.delete(artist)
         for venue in user_to_delete.venues:  # Assuming a one-to-many relationship
             db.session.delete(venue)
         for event in user_to_delete.events:  # Assuming a one-to-many relationship
             db.session.delete(event)
+        for tour in user_to_delete.tours:  # Assuming a one-to-many relationship with tours
+            db.session.delete(tour)
         # Delete the user
         db.session.delete(user_to_delete)
         db.session.commit()
