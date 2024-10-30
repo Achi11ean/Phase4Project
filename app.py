@@ -1164,7 +1164,9 @@ def signup():
     new_user = User(
         username=username,
         user_type=user_type,
-        profile_completed=False  # Set profile_completed to False initially
+        profile_completed=False,  # Set profile_completed to False initially
+        last_login=datetime.utcnow()  # Set last_login to current time
+
     )
     new_user.password = password  # This will hash the password
 
