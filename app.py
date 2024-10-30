@@ -1082,10 +1082,10 @@ class User(db.Model):
     password_hash = db.Column(db.String(128), nullable=False)
     user_type = db.Column(db.String(50), nullable=False)  # 'artist', 'attendee', etc.
     profile_completed = db.Column(db.Boolean, default=False)  # New field
-    venues = db.relationship('Venue', back_populates='creator')
-    artists = db.relationship('Artist', back_populates='creator')
-    events = db.relationship('Event', back_populates='creator')  # Link to Event model
-    tours = db.relationship("Tour", back_populates="creator")
+    venues = db.relationship('Venue', back_populates='creator', cascade="all, delete-orphan")
+    artists = db.relationship('Artist', back_populates='creator', cascade="all, delete-orphan")
+    events = db.relationship('Event', back_populates='creator', cascade="all, delete-orphan")  # Link to Event model
+    tours = db.relationship("Tour", back_populates="creator", cascade="all, delete-orphan")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)  # Creation time
     last_login = db.Column(db.DateTime)  # Updated on each login
     @property
@@ -1283,17 +1283,7 @@ def delete_user(user_id):
         return jsonify({'error': 'You cannot delete your own account'}), 400
 
     try:
-        for attendee in user_to_delete.attendees:  # Assuming a one-to-many relationship with attendees
-            db.session.delete(attendee)
-        for artist in user_to_delete.artists:  # Assuming a one-to-many relationship
-            db.session.delete(artist)
-        for venue in user_to_delete.venues:  # Assuming a one-to-many relationship
-            db.session.delete(venue)
-        for event in user_to_delete.events:  # Assuming a one-to-many relationship
-            db.session.delete(event)
-        for tour in user_to_delete.tours:  # Assuming a one-to-many relationship with tours
-            db.session.delete(tour)
-        # Delete the user
+        # Deleting user will cascade to associated venues, artists, events, attendees, and tours
         db.session.delete(user_to_delete)
         db.session.commit()
         return jsonify({'message': 'User deleted successfully'}), 200
