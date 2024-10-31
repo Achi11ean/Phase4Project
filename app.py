@@ -837,10 +837,12 @@ def update_artist(id):
     
     data = request.json
     artist = Artist.query.filter(Artist.id == id).first()
-    user_id = session.get('user_id')  # Retrieve user_id from session
+    user_id = data['user_id']
+    if user_id == '' or user_id == None:
+        user_id = session.get('user_id')  # Retrieve user_id from session
     
         # Check if the user is an admin or the creator of the artist
-    if not (is_admin_user(user_id) or artist.created_by_id == user_id):
+    if not (is_admin_user(user_id) or int(artist.created_by_id) == int(user_id)):
         return jsonify({"error": "Unauthorized access"}), 403
     if artist:
         try:
@@ -876,13 +878,18 @@ def delete_artist(id):
 
     # Retrieve the artist
     artist = Artist.query.get(id)
-    user_id = session.get('user_id')  # Retrieve user_id from session
+    #this is how you get the query param
+    user_id = request.args.get('user_id')
+    #create check for if you have query param
+    #if not, use session
+    if user_id == '' or user_id == None:
+        user_id = session.get('user_id')  # Retrieve user_id from session
 
     if not artist:
         return jsonify({"error": "Artist ID not found"}), 404
 
     # Check if the user is an admin or the creator of the artist
-    if not (is_admin_user(user_id) or artist.created_by_id == user_id):
+    if not (is_admin_user(user_id) or int(artist.created_by_id) == int(user_id)):
         return jsonify({"error": "Unauthorized access"}), 403
 
     # Proceed with deletion if authorized
@@ -1257,7 +1264,7 @@ def admin_only():
 
 def is_admin_user(id = ''):
     """Helper function to check if the currently logged-in user is an admin."""
-    user_id = id
+    user_id = int(id)
     if id == '' or id == None:
         user_id = session.get('user_id')
     if not user_id:
