@@ -541,7 +541,10 @@ class Attendee(db.Model, SerializerMixin):
             'first_name': self.first_name,
             'last_name': self.last_name,
             'email': self.email,
-            'created_by': {'id': self.creator.id, 'username': self.creator.username} if self.creator else None,
+            'created_by': {
+                'id': self.creator.id,
+                'username': self.creator.username
+            } if self.creator else None,
             'favorite_events': [{'id': event.id, 'name': event.name} for event in self.favorite_events] if self.favorite_events else [],
             'favorite_event_types': (
             self.favorite_event_types.split(',') if isinstance(self.favorite_event_types, str) and self.favorite_event_types else []
@@ -560,7 +563,7 @@ class Attendee(db.Model, SerializerMixin):
 @app.post("/api/attendees")
 def create_attendee():
     data = request.get_json()
-    user_id = session.get('user_id')  # Retrieve user_id from session
+    user_id = session.get('user_id')
 
     # Check for existing attendee with the same email
     existing_attendee = Attendee.query.filter_by(email=data['email']).first()
@@ -575,7 +578,7 @@ def create_attendee():
             email=data['email'],
             preferred_event_type=data.get('preferred_event_type'),  # Optional
             social_media=data.get('social_media'),  # Get social media, defaulting to None if not provided
-            created_by_id=data.get('user_id')
+            created_by_id=user_id  # Track the creator
 
         )
 
@@ -617,20 +620,12 @@ def get_all_attendees():
         print("Error retrieving attendees:", str(e))
         return jsonify({"error": str(e)}), 500  
 
-@app.get("/api/attendees/<int:id>")
-def get_attendee_by_id(id):
-    attendee = Attendee.query.get(id)  # Use get() for single ID lookup
-    if attendee:
-        return jsonify(attendee.to_dict()), 200
-    else:
-        return jsonify({"error": "Attendee ID not found"}), 404
+
 
 # PATCH: Update an attendee by ID
 # PATCH: Update an attendee by ID
 @app.patch("/api/attendees/<int:id>")
 def update_attendee(id):
-    data = request.json
-
     user_id = session.get('user_id')
 
     # Retrieve the attendee
@@ -639,10 +634,11 @@ def update_attendee(id):
         return jsonify({"error": "Attendee ID not found"}), 404
 
     # Check if the user is an admin or the creator of the attendee
-    if not (is_admin_user(user_id) or attendee.created_by_id == user_id):
+    if not (is_admin_user() or attendee.created_by_id == user_id):
         return jsonify({"error": "Unauthorized access"}), 403
 
     # Proceed with the update if authorized
+    data = request.json
     try:
         # Update direct fields
         for key in ['first_name', 'last_name', 'email', 'preferred_event_type', 'social_media']:
