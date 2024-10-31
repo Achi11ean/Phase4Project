@@ -620,12 +620,20 @@ def get_all_attendees():
         print("Error retrieving attendees:", str(e))
         return jsonify({"error": str(e)}), 500  
 
-
+@app.get("/api/attendees/<int:id>")
+def get_attendee_by_id(id):
+    attendee = Attendee.query.get(id)  # Use get() for single ID lookup
+    if attendee:
+        return jsonify(attendee.to_dict()), 200
+    else:
+        return jsonify({"error": "Attendee ID not found"}), 404
 
 # PATCH: Update an attendee by ID
 # PATCH: Update an attendee by ID
 @app.patch("/api/attendees/<int:id>")
 def update_attendee(id):
+    data = request.json
+
     user_id = session.get('user_id')
 
     # Retrieve the attendee
@@ -634,11 +642,10 @@ def update_attendee(id):
         return jsonify({"error": "Attendee ID not found"}), 404
 
     # Check if the user is an admin or the creator of the attendee
-    if not (is_admin_user() or attendee.created_by_id == user_id):
+    if not (is_admin_user(user_id) or attendee.created_by_id == user_id):
         return jsonify({"error": "Unauthorized access"}), 403
 
     # Proceed with the update if authorized
-    data = request.json
     try:
         # Update direct fields
         for key in ['first_name', 'last_name', 'email', 'preferred_event_type', 'social_media']:
