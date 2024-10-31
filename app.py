@@ -578,7 +578,7 @@ def create_attendee():
             email=data['email'],
             preferred_event_type=data.get('preferred_event_type'),  # Optional
             social_media=data.get('social_media'),  # Get social media, defaulting to None if not provided
-            created_by_id=user_id  # Track the creator
+            created_by_id=data.get('user_id')
 
         )
 
