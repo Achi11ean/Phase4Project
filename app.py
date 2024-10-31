@@ -541,10 +541,7 @@ class Attendee(db.Model, SerializerMixin):
             'first_name': self.first_name,
             'last_name': self.last_name,
             'email': self.email,
-            'created_by': {
-                'id': self.creator.id,
-                'username': self.creator.username
-            } if self.creator else None,
+            'created_by': {'id': self.creator.id, 'username': self.creator.username} if self.creator else None,
             'favorite_events': [{'id': event.id, 'name': event.name} for event in self.favorite_events] if self.favorite_events else [],
             'favorite_event_types': (
             self.favorite_event_types.split(',') if isinstance(self.favorite_event_types, str) and self.favorite_event_types else []
@@ -563,7 +560,7 @@ class Attendee(db.Model, SerializerMixin):
 @app.post("/api/attendees")
 def create_attendee():
     data = request.get_json()
-    user_id = session.get('user_id')
+    user_id = session.get('user_id')  # Retrieve user_id from session
 
     # Check for existing attendee with the same email
     existing_attendee = Attendee.query.filter_by(email=data['email']).first()
