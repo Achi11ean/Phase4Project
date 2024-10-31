@@ -184,7 +184,7 @@ class Venue(db.Model, SerializerMixin):
     email = db.Column(db.String(100), nullable=False)
     earnings = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=True)  # Added description column
-    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id', name='fk_venue_created_by'), nullable=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
     attendees = db.relationship('AttendeeVenue', back_populates='venue', cascade='all, delete-orphan')
     attendee_list = association_proxy('attendees', 'attendee')
@@ -235,6 +235,8 @@ def index():
 def create_venue():
     data = request.get_json()
     user_id = session.get('user_id')  # Retrieve user_id from session
+    print('USER ID IN CREATE ARTIST IS:', user_id)
+
 
     try:
         # Create a new venue object
@@ -244,7 +246,7 @@ def create_venue():
             email=data['email'],
             earnings=data['earnings'],
             description=data.get('description'),  # Get description, defaulting to None if not provided
-            created_by_id=user_id  # Track the creator
+            created_by_id=data.get('user_id')
         )
         # Add to the database
         db.session.add(new_venue)
@@ -265,19 +267,20 @@ def get_venue_by_id(id):
 
 @app.patch("/api/venues/<int:id>")
 def update_venue(id):
-    user_id = session.get('user_id')
-
+    data = request.json
     # Retrieve the venue
-    venue = Venue.query.get(id)
+    venue = Venue.query.filter(Venue.id == id).first()
     if not venue:
         return jsonify({"error": "Venue ID not found"}), 404
+    user_id = data['user_id']
+    if user_id == '' or user_id == None:
+        user_id = session.get('user_id')  # Retrieve user_id from session
 
     # Check if the user is an admin or the creator of the venue
-    if not (is_admin_user(user_id) or venue.created_by_id == user_id):
+    if not (is_admin_user(user_id) or int(venue.created_by_id) == int(user_id)):
         return jsonify({"error": "Unauthorized access"}), 403
 
     # Proceed with the update if authorized
-    data = request.json
     try:
         for key, value in data.items():
             setattr(venue, key, value)  # Update each attribute
@@ -294,11 +297,15 @@ def delete_venue(id):
 
     # Retrieve the venue
     venue = Venue.query.get(id)
+    user_id = request.args.get('user_id')
+    if user_id == '' or user_id == None:
+        user_id = session.get('user_id') 
+
     if not venue:
         return jsonify({"error": "Venue ID not found"}), 404
 
     # Check if the user is an admin or the creator of the venue
-    if not (is_admin_user() or venue.created_by_id == user_id):
+    if not (is_admin_user(user_id) or int(venue.created_by_id) == int(user_id)):
         return jsonify({"error": "Unauthorized access"}), 403
 
     # Proceed with deletion if authorized
@@ -346,7 +353,7 @@ class Event(db.Model, SerializerMixin):
     description = db.Column(db.String(150), nullable=False)
     venue_id = db.Column(db.Integer, db.ForeignKey('venues.id'), nullable=True)
     event_type = db.Column(db.String(50), nullable=False)
-    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))  # For creator tracking
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
     creator = db.relationship('User')  # Relationship to User model
     venue = db.relationship('Venue', backref='events')
@@ -384,6 +391,8 @@ def get_events():
 def create_event():
     data = request.get_json()
     user_id = session.get('user_id')
+    print('USER ID IN CREATE ARTIST IS:', user_id)
+
 
     
     try:
@@ -412,7 +421,7 @@ def create_event():
             description=data['description'],
             venue_id=data.get('venue_id', None),  # Allow venue_id to be None
             event_type=data['event_type'],
-            created_by_id=user_id  # Track the creator
+            created_by_id=data.get('user_id')
 
         )
 
@@ -438,13 +447,14 @@ def get_event_by_id(id):
 
 @app.patch("/api/events/<int:id>")
 def update_event(id):
-    user_id = session.get('user_id')
-
-    # if not (is_admin_user() or event.created_by_id == user_id):
-    #     return jsonify({"error": "Unauthorized access"}), 403
-
     data = request.json
     event = Event.query.filter(Event.id == id).first()
+
+    user_id = data['user_id']
+    if user_id == '' or user_id == None:
+        user_id = session.get('user_id')  # Retrieve user_id from session
+    if not (is_admin_user() or int(event.created_by_id) == int(user_id)):
+        return jsonify({"error": "Unauthorized access"}), 403
     if event:
         try:
             # If date is provided, ensure it's in the correct format
@@ -474,15 +484,17 @@ def update_event(id):
 # DELETE an event by ID
 @app.delete('/api/events/<int:id>')
 def delete_event(id):
-    user_id = session.get('user_id')
+    event = Event.query.get(id)
+    user_id = request.args.get('user_id')
+    if user_id == '' or user_id == None:
+        user_id = session.get('user_id')  # Retrieve user_id from session
 
     # Retrieve the event first
-    event = Event.query.get(id)
     if not event:
         return jsonify({"error": "Event ID not found"}), 404
 
     # Check if the user is an admin or the creator of the event
-    if not (is_admin_user() or event.created_by_id == user_id):
+    if not (is_admin_user(user_id) or int(event.created_by_id) == int(user_id)):
         return jsonify({"error": "Unauthorized access"}), 403
 
     # Proceed with deletion if authorized
@@ -541,10 +553,7 @@ class Attendee(db.Model, SerializerMixin):
             'first_name': self.first_name,
             'last_name': self.last_name,
             'email': self.email,
-            'created_by': {
-                'id': self.creator.id,
-                'username': self.creator.username
-            } if self.creator else None,
+            'created_by': {'id': self.creator.id, 'username': self.creator.username} if self.creator else None,
             'favorite_events': [{'id': event.id, 'name': event.name} for event in self.favorite_events] if self.favorite_events else [],
             'favorite_event_types': (
             self.favorite_event_types.split(',') if isinstance(self.favorite_event_types, str) and self.favorite_event_types else []
@@ -578,7 +587,7 @@ def create_attendee():
             email=data['email'],
             preferred_event_type=data.get('preferred_event_type'),  # Optional
             social_media=data.get('social_media'),  # Get social media, defaulting to None if not provided
-            created_by_id=user_id  # Track the creator
+            created_by_id=data.get('user_id')
 
         )
 
@@ -626,15 +635,17 @@ def get_all_attendees():
 # PATCH: Update an attendee by ID
 @app.patch("/api/attendees/<int:id>")
 def update_attendee(id):
-    user_id = session.get('user_id')
-
+    data = request.json
+    user_id = data['user_id']
+    if user_id == '' or user_id == None:
+        user_id = session.get('user_id')  # Retrieve user_id from session
     # Retrieve the attendee
     attendee = Attendee.query.get(id)
     if not attendee:
         return jsonify({"error": "Attendee ID not found"}), 404
 
     # Check if the user is an admin or the creator of the attendee
-    if not (is_admin_user() or attendee.created_by_id == user_id):
+    if not (is_admin_user() or int(attendee.created_by_id) == int(user_id)):
         return jsonify({"error": "Unauthorized access"}), 403
 
     # Proceed with the update if authorized
@@ -682,13 +693,16 @@ def update_attendee(id):
 # DELETE: Remove an attendee by ID
 @app.delete('/api/attendees/<int:id>')
 def delete_attendee(id):
-    user_id = session.get('user_id')
     attendee = Attendee.query.get(id)
+    user_id = request.args.get('user_id')
+    if user_id == '' or user_id == None:
+        user_id = session.get('user_id')  # Retrieve user_id from session
+
     if not attendee:
         return jsonify({"error": "Attendee ID not found"}), 404
 
     # Check if the user is an admin or the creator of the attendee
-    if not (is_admin_user() or attendee.created_by_id == user_id):
+    if not (is_admin_user() or int(attendee.created_by_id) == int(user_id)):
         return jsonify({"error": "Unauthorized access"}), 403
 
     # Proceed with deletion if authorized
@@ -936,7 +950,7 @@ class Tour(db.Model, SerializerMixin):
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     description = db.Column(db.Text, nullable=True)
-    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))  # Track the creator by user ID
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     social_media_handles = db.Column(db.String(255), nullable=True)
     creator = db.relationship("User", back_populates="tours")  # Establish relationship with User
 
@@ -950,10 +964,7 @@ class Tour(db.Model, SerializerMixin):
             'start_date': self.start_date.strftime('%m/%d/%Y'),
             'end_date': self.end_date.strftime('%m/%d/%Y'),
             'description': self.description,
-            'created_by': {
-                'id': self.creator.id,
-                'username': self.creator.username
-            } if self.creator else None, # Use the name instead of ID
+            'created_by': {'id': self.creator.id, 'username': self.creator.username} if self.creator else None,
             'social_media_handles': self.social_media_handles,
             'events': [{'name': event.name} for event in self.events] if self.events else [],
         }
@@ -972,7 +983,7 @@ def create_tour():
             end_date=datetime.strptime(data['end_date'], '%m/%d/%Y'),
             description=data['description'],
             social_media_handles=data.get('social_media_handles'),  # Optional
-            created_by_id=user_id  # Track the creator
+            created_by_id=data.get('user_id')
         )
 
         # Assign events to the tour
@@ -999,13 +1010,15 @@ def get_all_tours():
 
 @app.patch("/api/tours/<int:id>")
 def update_tour(id):
-    user_id = session.get('user_id')
-    tour = Tour.query.get(id)
+    data = request.get_json()
+    tour = Tour.query.filter(Tour.id == id).first()
+    user_id = data['user_id']
+    if user_id == '' or user_id == None:
+        user_id = session.get('user_id')  # Retrieve user_id from session
     if not tour:
         return jsonify({"error": "Tour ID not found"}), 404
-    if not (is_admin_user() or tour.created_by_id == user_id):
+    if not (is_admin_user() or int(tour.created_by_id) == int(user_id)):
         return jsonify({"error": "Unauthorized access"}), 403
-    data = request.get_json()
     tour = Tour.query.get_or_404(id)  # Automatically raises a 404 if not found
     
     try:
@@ -1020,12 +1033,6 @@ def update_tour(id):
         if 'end_date' in data:
             tour.end_date = datetime.strptime(data['end_date'], '%m/%d/%Y')  # Correct format
 
-
-        # Update created_by_id or created_by_artist_id
-        if 'created_by_id' in data:
-            tour.created_by_id = data['created_by_id']
-        if 'created_by_artist_id' in data:
-            tour.created_by_artist_id = data['created_by_artist_id']
 
         # Update event associations
         if 'event_ids' in data:
@@ -1043,11 +1050,15 @@ def update_tour(id):
 
 @app.delete("/api/tours/<int:id>")
 def delete_tour(id):
-    user_id = session.get('user_id')
     tour = Tour.query.get(id)
+
+    user_id = request.args.get('user_id')
+    if user_id == '' or user_id == None:
+        user_id = session.get('user_id')  # Retrieve user_id from sessio
+
     if not tour:
         return jsonify({"error": "Tour ID not found"}), 404
-    if not (is_admin_user() or tour.created_by_id == user_id):
+    if not (is_admin_user(user_id) or int(tour.created_by_id) == int(user_id)):
         return jsonify({"error": "Unauthorized access"}), 403
 
     try:
@@ -1264,7 +1275,7 @@ def admin_only():
 
 def is_admin_user(id = ''):
     """Helper function to check if the currently logged-in user is an admin."""
-    user_id = int(id)
+    user_id = id
     if id == '' or id == None:
         user_id = session.get('user_id')
     if not user_id:
@@ -1279,8 +1290,8 @@ def is_admin_user(id = ''):
 @app.delete('/api/users/<int:user_id>')
 def delete_user(user_id):
     # Check if the current user is an admin
-    # if not is_admin_user():
-    #     return jsonify({'error': 'Unauthorized access'}), 403
+    if not is_admin_user():
+        return jsonify({'error': 'Unauthorized access'}), 403
 
     # Retrieve the user to be deleted
     user_to_delete = User.query.get(user_id)
