@@ -486,6 +486,7 @@ def update_event(id):
 def delete_event(id):
     event = Event.query.get(id)
     user_id = request.args.get('user_id')
+    print('USER ID IS:', user_id)
     if user_id == '' or user_id == None:
         user_id = session.get('user_id')  # Retrieve user_id from session
 
