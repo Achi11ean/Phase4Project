@@ -1277,30 +1277,38 @@ def admin_only():
 def is_admin_user(id = ''):
     """Helper function to check if the currently logged-in user is an admin."""
     user_id = id
+    print('USER ID IN ADMING IS:', user_id)
     if id == '' or id == None:
         user_id = session.get('user_id')
     if not user_id:
         return False  # No user_id in session means user is not logged in
 
     user = User.query.get(user_id)
+    print('TESTED USER IS:', user)
     if user.user_type == 'admin':
         return True
     else:
         return False
 
-@app.delete('/api/users/<int:user_id>')
-def delete_user(user_id):
+@app.delete('/api/users/<int:id>')
+def delete_user(id):
+    print('ID TO DELETE IS: ', id)
+    user_id = request.args.get('user_id')
+    print('USER ID IS:', user_id)
+    if user_id == '' or user_id == None:
+        user_id = session.get('user_id')
     # Check if the current user is an admin
-    # if not is_admin_user():
-    #     return jsonify({'error': 'Unauthorized access'}), 403
+    if not is_admin_user(user_id):
+        return jsonify({'error': 'Unauthorized access'}), 403
 
     # Retrieve the user to be deleted
-    user_to_delete = User.query.get(user_id)
+    user_to_delete = User.query.get(id)
+    print('RETRIEVED USER IS:', user_to_delete)
     if not user_to_delete:
         return jsonify({'error': 'User not found'}), 404
 
     # Optional: Prevent admins from deleting themselves
-    if user_to_delete.id == session.get('user_id'):
+    if user_to_delete.id == user_id:
         return jsonify({'error': 'You cannot delete your own account'}), 400
 
     try:
