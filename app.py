@@ -637,16 +637,16 @@ def get_all_attendees():
 @app.patch("/api/attendees/<int:id>")
 def update_attendee(id):
     data = request.json
+    attendee = Attendee.query.get(id)
+    if not attendee:
+        return jsonify({"error": "Attendee ID not found"}), 404
     user_id = data['user_id']
     if user_id == '' or user_id == None:
         user_id = session.get('user_id')  # Retrieve user_id from session
     # Retrieve the attendee
-    attendee = Attendee.query.get(id)
-    if not attendee:
-        return jsonify({"error": "Attendee ID not found"}), 404
 
     # Check if the user is an admin or the creator of the attendee
-    if not (is_admin_user() or int(attendee.created_by_id) == int(user_id)):
+    if not (is_admin_user(user_id) or int(attendee.created_by_id) == int(user_id)):
         return jsonify({"error": "Unauthorized access"}), 403
 
     # Proceed with the update if authorized
