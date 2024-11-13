@@ -1507,46 +1507,54 @@ def get_calendar_data():
     try:
         # Fetch all events
         events = Event.query.all()
-        events_list = [
-            {
-                'id': event.id,
-                'title': event.name,
-                'start': event.date.strftime('%Y-%m-%dT') + event.time,  # ISO format
-                'end': event.date.strftime('%Y-%m-%dT') + event.time,
-                'time': datetime.strptime(event.time, '%H:%M').strftime('%I:%M %p'),  # Format as 12-hour with AM/PM
-                'type': 'event',
-                'description': event.description,
-                'location': event.location,
-                'event_type': event.event_type,
-                'created_by': event.created_by_id,
-                'venue': event.venue.name if event.venue else None,
-            }
-            for event in events
-        ]
+        events_list = [event.to_dict() for event in events]
 
         # Fetch all tours
         tours = Tour.query.all()
-        tours_list = [
+        tours_list = [tour.to_dict() for tour in tours]
+
+        # Process events and tours for the calendar format
+        processed_events = [
             {
-                'id': tour.id,
-                'title': tour.name,
-                'start': tour.start_date.strftime('%Y-%m-%dT00:00:00'),  # ISO format
-                'end': tour.end_date.strftime('%Y-%m-%dT23:59:59'),  # ISO format
-                'type': 'tour',
-                'description': tour.description,
-                'social_media_handles': tour.social_media_handles,
-                'created_by': tour.created_by_id,
-                'events': [event.name for event in tour.events] if tour.events else []
+                'id': event['id'],
+                'title': event['name'],
+                'start': event['date'].strftime('%Y-%m-%dT%H:%M:%S'),  # Use date and time in ISO format
+                'end': event['date'].strftime('%Y-%m-%dT%H:%M:%S'),
+                'time': datetime.strptime(event['time'], '%H:%M').strftime('%I:%M %p'),  # 12-hour time format
+                'type': 'event',
+                'description': event['description'],
+                'location': event['location'],
+                'event_type': event['event_type'],
+                'created_by': event['created_by'],
+                'venue': event['venue'],
             }
-            for tour in tours
+            for event in events_list
+        ]
+
+        processed_tours = [
+            {
+                'id': tour['id'],
+                'title': tour['name'],
+                'start': datetime.strptime(tour['start_date'], '%m/%d/%Y').strftime('%Y-%m-%dT00:00:00'),
+                'end': datetime.strptime(tour['end_date'], '%m/%d/%Y').strftime('%Y-%m-%dT23:59:59'),
+                'type': 'tour',
+                'description': tour['description'],
+                'social_media_handles': tour['social_media_handles'],
+                'created_by': tour['created_by'],
+                'events': tour['events'],
+            }
+            for tour in tours_list
         ]
 
         # Combine events and tours
-        calendar_data = events_list + tours_list
+        calendar_data = processed_events + processed_tours
+        print("Calendar Data:", calendar_data)  # Debugging log
         return jsonify(calendar_data), 200
 
     except Exception as e:
+        print("Error in /api/calendar:", str(e))  # Log error for debugging
         return jsonify({"error": str(e)}), 500
+
 
 
 
