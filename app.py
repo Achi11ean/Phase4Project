@@ -1511,8 +1511,8 @@ def get_calendar_data():
             {
                 'id': event.id,
                 'title': event.name,
-                'start': event.date.strftime('%Y-%m-%d'),
-                'end': event.date.strftime('%Y-%m-%d'),
+                'start': f"{event.date.strftime('%A, %B %d, %Y')} {event.time}",
+                'end': f"{event.date.strftime('%A, %B %d, %Y')} {event.time}",
                 'type': 'event',
                 'description': event.description,
                 'location': event.location,
@@ -1529,8 +1529,8 @@ def get_calendar_data():
             {
                 'id': tour.id,
                 'title': tour.name,
-                'start': tour.start_date.strftime('%Y-%m-%d'),
-                'end': tour.end_date.strftime('%Y-%m-%d'),
+                'start': tour.start_date.strftime('%A, %B %d, %Y'),
+                'end': tour.end_date.strftime('%A, %B %d, %Y'),
                 'type': 'tour',
                 'description': tour.description,
                 'social_media_handles': tour.social_media_handles,
@@ -1546,3 +1546,5 @@ def get_calendar_data():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
