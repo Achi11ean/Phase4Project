@@ -1513,6 +1513,7 @@ def get_calendar_data():
                 'title': event.name,
                 'start': f"{event.date.strftime('%A, %B %d, %Y')} {event.time}",
                 'end': f"{event.date.strftime('%A, %B %d, %Y')} {event.time}",
+                'time': datetime.strptime(event.time, '%H:%M').strftime('%I:%M %p'),  # Format time as 12-hour with AM/PM
                 'type': 'event',
                 'description': event.description,
                 'location': event.location,
@@ -1546,5 +1547,6 @@ def get_calendar_data():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
