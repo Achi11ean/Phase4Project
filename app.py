@@ -1498,3 +1498,51 @@ def search_users():
     users_response = [user.to_dict() for user in users_data]
 
     return jsonify({'users': users_response}), 200
+
+
+
+    #--------------------CALENDAR---------------#
+@app.get("/api/calendar")
+def get_calendar_data():
+    try:
+        # Fetch all events
+        events = Event.query.all()
+        events_list = [
+            {
+                'id': event.id,
+                'title': event.name,
+                'start': event.date.strftime('%Y-%m-%d'),
+                'end': event.date.strftime('%Y-%m-%d'),
+                'type': 'event',
+                'description': event.description,
+                'location': event.location,
+                'event_type': event.event_type,
+                'created_by': event.created_by_id,
+                'venue': event.venue.name if event.venue else None,
+            }
+            for event in events
+        ]
+
+        # Fetch all tours
+        tours = Tour.query.all()
+        tours_list = [
+            {
+                'id': tour.id,
+                'title': tour.name,
+                'start': tour.start_date.strftime('%Y-%m-%d'),
+                'end': tour.end_date.strftime('%Y-%m-%d'),
+                'type': 'tour',
+                'description': tour.description,
+                'social_media_handles': tour.social_media_handles,
+                'created_by': tour.created_by_id,
+                'events': [event.name for event in tour.events] if tour.events else []
+            }
+            for tour in tours
+        ]
+
+        # Combine events and tours
+        calendar_data = events_list + tours_list
+        return jsonify(calendar_data), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
