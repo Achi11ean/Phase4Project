@@ -1511,9 +1511,9 @@ def get_calendar_data():
             {
                 'id': event.id,
                 'title': event.name,
-                'start': f"{event.date.strftime('%A, %B %d, %Y')} {event.time}",
-                'end': f"{event.date.strftime('%A, %B %d, %Y')} {event.time}",
-                'time': datetime.strptime(event.time, '%H:%M').strftime('%I:%M %p'),  # Format time as 12-hour with AM/PM
+                'start': event.date.strftime('%Y-%m-%dT') + event.time,  # ISO format
+                'end': event.date.strftime('%Y-%m-%dT') + event.time,
+                'time': datetime.strptime(event.time, '%H:%M').strftime('%I:%M %p'),  # Format as 12-hour with AM/PM
                 'type': 'event',
                 'description': event.description,
                 'location': event.location,
@@ -1530,8 +1530,8 @@ def get_calendar_data():
             {
                 'id': tour.id,
                 'title': tour.name,
-                'start': tour.start_date.strftime('%A, %B %d, %Y'),
-                'end': tour.end_date.strftime('%A, %B %d, %Y'),
+                'start': tour.start_date.strftime('%Y-%m-%dT00:00:00'),  # ISO format
+                'end': tour.end_date.strftime('%Y-%m-%dT23:59:59'),  # ISO format
                 'type': 'tour',
                 'description': tour.description,
                 'social_media_handles': tour.social_media_handles,
@@ -1547,6 +1547,7 @@ def get_calendar_data():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 
