@@ -1505,6 +1505,15 @@ def search_users():
 @app.get("/api/calendar")
 def get_calendar_data():
     try:
+        # Define the helper function to format event time
+        def get_formatted_time(event_time):
+            try:
+                # Try parsing as 12-hour format (e.g., "02:30 PM")
+                return datetime.strptime(event_time, '%I:%M %p').strftime('%H:%M:%S')
+            except ValueError:
+                # Fallback to 24-hour format (e.g., "14:30")
+                return datetime.strptime(event_time, '%H:%M').strftime('%H:%M:%S')
+
         # Fetch all events
         events = Event.query.all()
         events_list = [event.to_dict() for event in events]
@@ -1513,7 +1522,7 @@ def get_calendar_data():
         tours = Tour.query.all()
         tours_list = [tour.to_dict() for tour in tours]
 
-        # Process events and tours for the calendar format
+        # Process events for the calendar format
         processed_events = [
             {
                 'id': event['id'],
@@ -1528,11 +1537,10 @@ def get_calendar_data():
                 'venue': event['venue'],
                 'time': event['time'],
             }
-            for event in events_list  # <-- Iterate over events_list
+            for event in events_list
         ]
 
-
-
+        # Process tours for the calendar format
         processed_tours = [
             {
                 'id': tour['id'],
@@ -1550,13 +1558,12 @@ def get_calendar_data():
 
         # Combine events and tours
         calendar_data = processed_events + processed_tours
-        print("Calendar Data:", calendar_data)  # Debugging log
+        print("Final calendar data:", calendar_data)
         return jsonify(calendar_data), 200
 
     except Exception as e:
-        print("Error in /api/calendar:", str(e))  # Log error for debugging
+        print("Error in /api/calendar:", str(e))
         return jsonify({"error": str(e)}), 500
-
 
 
 
