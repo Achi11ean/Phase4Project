@@ -1518,18 +1518,20 @@ def get_calendar_data():
             {
                 'id': event['id'],
                 'title': event['name'],
-                'start': event['date'].strftime('%Y-%m-%dT%H:%M:%S'),  # Use date and time in ISO format
-                'end': event['date'].strftime('%Y-%m-%dT%H:%M:%S'),
-                'time': datetime.strptime(event['time'], '%H:%M').strftime('%I:%M %p'),  # 12-hour time format
+                'start': f"{event['date'].strftime('%Y-%m-%d')}T{get_formatted_time(event['time'])}",
+                'end': f"{event['date'].strftime('%Y-%m-%d')}T{get_formatted_time(event['time'])}",
                 'type': 'event',
                 'description': event['description'],
                 'location': event['location'],
                 'event_type': event['event_type'],
                 'created_by': event['created_by'],
                 'venue': event['venue'],
+                'time': event['time'],
             }
-            for event in events_list
+            for event in events_list  # <-- Iterate over events_list
         ]
+
+
 
         processed_tours = [
             {
